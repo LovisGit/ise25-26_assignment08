@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -114,6 +115,32 @@ public class ReviewServiceTest {
         verify(posDataService).getById(pos.getId());
         verify(reviewDataService).filter(pos, true);
         assertThat(retrievedReviews).hasSize(reviews.size());
+    }
+
+    @Test
+    void approvalDoesNotReachQuorum() {
+        // given
+        Review review = TestFixtures.getReviewFixtures().getFirst().toBuilder()
+                .approvalCount(0)
+                .approved(false)
+                .build();
+        User approver = TestFixtures.getUserFixtures().getLast();
+        assertNotNull(approver.getId());
+        assertNotNull(review.getId());
+
+        when(userDataService.getById(approver.getId())).thenReturn(approver);
+        when(reviewDataService.getById(review.getId())).thenReturn(review);
+        when(reviewDataService.upsert(any(Review.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        Review result = reviewService.approve(review, approver.getId());
+
+        // then
+        verify(userDataService).getById(approver.getId());
+        verify(reviewDataService).getById(review.getId());
+        verify(reviewDataService).upsert(any(Review.class));
+        assertThat(result.approvalCount()).isEqualTo(1);
+        assertThat(result.approved()).isFalse();
     }
 
     @Test
